@@ -26,7 +26,7 @@ from lisp.plugins.midi.midi_cue import MidiCue
 from lisp.plugins.midi.midi_io import MIDIOutput, MIDIInput, MIDIBase
 from lisp.plugins.midi.midi_settings import MIDISettings
 from lisp.plugins.midi.midi_utils import midi_output_names, midi_input_names
-from lisp.plugins.midi.port_monitor import ALSAPortMonitor
+from lisp.plugins.midi.port_monitor import create_port_monitor
 from lisp.ui.settings.app_configuration import AppConfigurationDialog
 from lisp.ui.ui_utils import translate
 
@@ -77,7 +77,7 @@ class Midi(Plugin):
         # Monitor ports, for auto-reconnection.
         # Since current midi backends are not reliable on
         # connection/disconnection detection, we need to use the native APIs.
-        self.port_monitor = ALSAPortMonitor()
+        self.port_monitor = create_port_monitor()
         self.port_monitor.port_removed.connect(
             self._on_port_removed, Connection.QtQueued
         )

@@ -24,6 +24,11 @@ try:
 except ImportError:
     alsaseq = False
 
+try:
+    import rtmidi
+except ImportError:
+    rtmidi = None
+
 from lisp.core.signal import Signal
 from lisp.ui.ui_utils import translate
 
@@ -31,6 +36,13 @@ logger = logging.getLogger(__name__)
 
 
 class PortMonitor:
+    """Base MIDI port monitor.
+
+    Emits ``port_added`` / ``port_removed`` when the set of available MIDI
+    ports changes. The plain base is also the no-op fallback used when no
+    platform backend (ALSA sequencer or rtmidi) is available.
+    """
+
     ClientName = "LinuxShowPlayer_Monitor"
 
     def __init__(self):
@@ -108,4 +120,76 @@ class _ALSAPortMonitor(PortMonitor):
                     self.port_added.emit()
 
 
+class RtmidiPortMonitor(PortMonitor):
+    """Cross-platform MIDI port monitor backed by python-rtmidi.
+
+    Covers Windows (WinMM) and macOS (CoreMIDI) -- and Linux as a fallback when
+    pyalsa is unavailable. rtmidi exposes no native hot-plug notification (its
+    callbacks are for incoming messages, not port changes), so availability is
+    tracked by polling the port list on a daemon thread and diffing it.
+    """
+
+    POLL_INTERVAL = 2.0
+
+    def __init__(self):
+        super().__init__()
+        self.__running = True
+        self.__midi_in = rtmidi.MidiIn()
+        self.__midi_out = rtmidi.MidiOut()
+        self.__thread = Thread(target=self.__loop, daemon=True)
+        self.__thread.start()
+
+    def stop(self):
+        self.__running = False
+
+    def __ports(self):
+        try:
+            return set(self.__midi_in.get_ports()) | set(
+                self.__midi_out.get_ports()
+            )
+        except Exception:
+            logger.warning(
+                translate(
+                    "MIDIError", "Cannot enumerate MIDI ports."
+                ),
+                exc_info=True,
+            )
+            return set()
+
+    def __loop(self):
+        logger.debug("Started polling rtmidi MIDI ports")
+        known = self.__ports()
+        while self.__running:
+            sleep(RtmidiPortMonitor.POLL_INTERVAL)
+            current = self.__ports()
+            if current != known:
+                added = current - known
+                removed = known - current
+                known = current
+                if removed:
+                    logger.debug("rtmidi MIDI port(s) removed.")
+                    self.port_removed.emit()
+                if added:
+                    logger.debug("rtmidi MIDI new port(s) created.")
+                    self.port_added.emit()
+
+
+def create_port_monitor():
+    """Return the MIDI port monitor best suited to this platform.
+
+    Single decision point (capability detection, not platform branching):
+      * pyalsa available  -> ALSA sequencer monitor (Linux, unchanged path);
+      * else rtmidi        -> polling monitor (Windows/macOS, Linux fallback);
+      * else               -> no-op base monitor.
+    """
+    if alsaseq:
+        return _ALSAPortMonitor()
+    if rtmidi is not None:
+        return RtmidiPortMonitor()
+    return PortMonitor()
+
+
+# Backward-compatible alias: resolves to the ALSA monitor when pyalsa is
+# present, otherwise to the no-op base (kept for external callers; new code
+# should use create_port_monitor()).
 ALSAPortMonitor = _ALSAPortMonitor if alsaseq else PortMonitor
