@@ -27,6 +27,10 @@ class PulseSink(GstMediaElement):
     MediaType = MediaType.Audio
     Name = QT_TRANSLATE_NOOP("MediaElementName", "PulseAudio Out")
 
+    @staticmethod
+    def is_available():
+        return Gst.ElementFactory.find("pulsesink") is not None
+
     def __init__(self, pipeline):
         super().__init__(pipeline)
 

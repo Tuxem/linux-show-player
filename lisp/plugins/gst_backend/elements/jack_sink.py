@@ -17,7 +17,13 @@
 
 import logging
 
-import jack
+try:
+    import jack
+except ImportError:
+    # libjack / JACK-Client is not installed: JACK output stays unavailable.
+    # See JackSink.is_available(); registration is skipped in elements.load().
+    jack = None
+
 from PyQt5.QtCore import QT_TRANSLATE_NOOP
 
 from lisp.backend.media_element import ElementType, MediaType
@@ -41,6 +47,13 @@ class JackSink(GstMediaElement):
     _clients = []
 
     connections = Property(default=[])
+
+    @staticmethod
+    def is_available():
+        return (
+            jack is not None
+            and Gst.ElementFactory.find("jackaudiosink") is not None
+        )
 
     def __init__(self, pipeline):
         super().__init__(pipeline)

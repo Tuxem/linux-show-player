@@ -27,6 +27,10 @@ class AutoSink(GstMediaElement):
     MediaType = MediaType.Audio
     Name = QT_TRANSLATE_NOOP("MediaElementName", "System Out")
 
+    @staticmethod
+    def is_available():
+        return Gst.ElementFactory.find("autoaudiosink") is not None
+
     def __init__(self, pipeline):
         super().__init__(pipeline)
 

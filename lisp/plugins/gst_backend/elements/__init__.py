@@ -15,10 +15,13 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
 from os.path import dirname
 
 from lisp.backend.media_element import ElementType
 from lisp.core.loading import load_classes
+
+logger = logging.getLogger(__name__)
 
 __INPUTS = {}
 __OUTPUTS = {}
@@ -27,6 +30,18 @@ __PLUGINS = {}
 
 def load():
     for _, element_class in load_classes(__package__, dirname(__file__)):
+        # Capability detection: an element whose backing GStreamer feature is
+        # not available on this platform/build declares itself unavailable and
+        # is not registered, so it never appears in the UI nor gets selected
+        # (which would crash the pipeline). This is the single decision point
+        # for sink availability; no scattered `sys.platform` checks.
+        is_available = getattr(element_class, "is_available", None)
+        if is_available is not None and not is_available():
+            logger.debug(
+                "Skipping unavailable element: %s", element_class.__name__
+            )
+            continue
+
         if element_class.ElementType == ElementType.Input:
             __INPUTS[element_class.__name__] = element_class
         elif element_class.ElementType == ElementType.Output:

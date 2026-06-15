@@ -32,6 +32,10 @@ class AlsaSink(GstMediaElement):
     FALLBACK_DEVICE = "default"
     device = GstProperty("alsa_sink", "device", default="")
 
+    @staticmethod
+    def is_available():
+        return Gst.ElementFactory.find("alsasink") is not None
+
     def __init__(self, pipeline):
         super().__init__(pipeline)
 
