@@ -18,7 +18,6 @@
 import argparse
 import logging
 import os
-import signal
 import sys
 from functools import partial
 from logging.handlers import RotatingFileHandler
@@ -30,6 +29,7 @@ from PyQt5.QtWidgets import QApplication
 from lisp import app_dirs, DEFAULT_APP_CONFIG, USER_APP_CONFIG, plugins
 from lisp.application import Application
 from lisp.core.configuration import JSONFileConfiguration
+from lisp.core.os_signals import install_quit_handler
 from lisp.ui import themes
 from lisp.ui.icons import IconTheme
 from lisp.ui.ui_utils import install_translation, PyQtUnixSignalHandler
@@ -155,12 +155,13 @@ def main():
     lisp_app = Application(app_conf)
     plugins.load_plugins(lisp_app)
 
-    # Handle SIGTERM and SIGINT by quitting the QApplication
+    # Handle termination signals by quitting the QApplication.
+    # Registration is guarded per-signal so that platforms lacking a given
+    # signal (e.g. SIGTERM/SIGBREAK on some systems) do not crash startup.
     def handle_quit_signal(*_):
         qt_app.quit()
 
-    signal.signal(signal.SIGTERM, handle_quit_signal)
-    signal.signal(signal.SIGINT, handle_quit_signal)
+    install_quit_handler(handle_quit_signal)
 
     with PyQtUnixSignalHandler():
         # Defer application start when QT main-loop starts

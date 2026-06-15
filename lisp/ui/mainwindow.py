@@ -18,6 +18,7 @@
 import logging
 import os
 from functools import partial
+from pathlib import Path
 
 from PyQt5 import QtCore
 from PyQt5.QtCore import pyqtSignal, QT_TRANSLATE_NOOP
@@ -281,7 +282,9 @@ class MainWindow(QMainWindow, metaclass=QSingleton):
         path, _ = QFileDialog.getOpenFileName(
             self,
             filter="*.lsp",
-            directory=self._app.conf.get("session.lastPath", os.getenv("HOME")),
+            directory=self._app.conf.get(
+                "session.lastPath", str(Path.home())
+            ),
         )
 
         if os.path.exists(path):
@@ -295,7 +298,7 @@ class MainWindow(QMainWindow, metaclass=QSingleton):
             directory = self._app.session.dir()
         else:
             directory = self._app.conf.get(
-                "session.lastPath", os.getenv("HOME")
+                "session.lastPath", str(Path.home())
             )
 
         path, _ = QFileDialog.getSaveFileName(
