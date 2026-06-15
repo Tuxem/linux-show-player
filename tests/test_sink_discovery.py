@@ -59,3 +59,34 @@ def test_alsa_sink_registered_when_available(elements):
 @pytest.mark.skipif(not _gst_has("pulsesink"), reason="pulsesink not installed")
 def test_pulse_sink_registered_when_available(elements):
     assert "PulseSink" in elements.outputs()
+
+
+@pytest.mark.parametrize(
+    "sink_class, gst_element",
+    [
+        ("AlsaSink", "alsasink"),
+        ("PulseSink", "pulsesink"),
+        ("JackSink", "jackaudiosink"),
+        ("WasapiSink", "wasapisink"),
+        ("CoreaudioSink", "osxaudiosink"),
+    ],
+)
+def test_sink_registered_iff_element_available(
+    elements, sink_class, gst_element
+):
+    """A platform-specific sink is registered exactly when its element exists.
+
+    This is the symmetric guarantee: Linux sinks stay on Linux, and the
+    Windows/macOS sinks never leak into the UI where their element is absent.
+    JackSink additionally requires the `jack` module, so only assert its
+    presence implication when it is actually registered.
+    """
+    registered = sink_class in elements.outputs()
+    available = _gst_has(gst_element)
+
+    if not available:
+        assert not registered
+    elif sink_class != "JackSink":
+        # JackSink also needs the importable `jack` module; skip the forward
+        # implication for it to avoid coupling to that optional dependency.
+        assert registered
