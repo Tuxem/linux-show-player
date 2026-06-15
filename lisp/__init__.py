@@ -18,7 +18,7 @@
 import os
 from os import path
 
-from appdirs import AppDirs
+from platformdirs import PlatformDirs
 
 __author__ = "Francesco Ceruti"
 __email__ = "ceppofrancy@gmail.com"
@@ -27,9 +27,14 @@ __license__ = "GPLv3"
 __version_info__ = (0, 6, 5)
 __version__ = ".".join(map(str, __version_info__))
 
-# The version passed follows <major>.<minor>
-app_dirs = AppDirs(
-    "LinuxShowPlayer", version="{}.{}".format(*__version_info__[0:2])
+# The version passed follows <major>.<minor>.
+# platformdirs is the maintained drop-in successor of appdirs; on Linux it
+# resolves the exact same XDG config/data/cache directories, so existing user
+# configuration and sessions keep working unchanged.
+app_dirs = PlatformDirs(
+    "LinuxShowPlayer",
+    appauthor=False,
+    version="{}.{}".format(*__version_info__[0:2]),
 )
 
 # Application wide "constants"
@@ -44,6 +49,10 @@ PLUGINS_PATH = path.join(APP_DIR, "plugins")
 USER_PLUGINS_PATH = path.join(app_dirs.user_data_dir, "plugins")
 
 DEFAULT_CACHE_DIR = path.join(app_dirs.user_data_dir, "cache")
+
+# Keep logs under the cache directory, preserving the historical (appdirs)
+# layout: platformdirs would otherwise place them under XDG_STATE_HOME on Linux.
+USER_LOG_DIR = path.join(app_dirs.user_cache_dir, "log")
 
 ICON_THEMES_DIR = path.join(APP_DIR, "ui", "icons")
 ICON_THEME_COMMON = "lisp"

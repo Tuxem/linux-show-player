@@ -73,6 +73,27 @@ def test_linux_xdg_paths(tmp_path, monkeypatch):
     assert lisp.DEFAULT_CACHE_DIR == str(expected_data / "cache")
 
 
+@pytest.mark.skipif(
+    sys.platform != "linux", reason="XDG path layout is Linux-specific"
+)
+def test_linux_log_dir_preserved_under_cache(tmp_path, monkeypatch):
+    """Logs must stay under the cache dir (historical appdirs layout).
+
+    platformdirs would otherwise resolve logs under $XDG_STATE_HOME; preserving
+    the location avoids "moving" users' logs across the appdirs->platformdirs
+    migration.
+    """
+    cache_home = tmp_path / "cache"
+
+    lisp = _reload_lisp(
+        monkeypatch, {"XDG_CACHE_HOME": str(cache_home)}
+    )
+    version = "{}.{}".format(*lisp.__version_info__[0:2])
+
+    expected_log = cache_home / "LinuxShowPlayer" / version / "log"
+    assert lisp.USER_LOG_DIR == str(expected_log)
+
+
 def test_app_dir_is_package_dir(monkeypatch):
     """APP_DIR must always point at the installed ``lisp`` package directory."""
     lisp = _reload_lisp(monkeypatch, {})

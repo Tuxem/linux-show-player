@@ -26,7 +26,13 @@ from PyQt5.QtCore import QLocale, QLibraryInfo, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
-from lisp import app_dirs, DEFAULT_APP_CONFIG, USER_APP_CONFIG, plugins
+from lisp import (
+    app_dirs,
+    DEFAULT_APP_CONFIG,
+    USER_APP_CONFIG,
+    USER_LOG_DIR,
+    plugins,
+)
 from lisp.application import Application
 from lisp.core.configuration import JSONFileConfiguration
 from lisp.core.os_signals import install_quit_handler
@@ -92,10 +98,10 @@ def main():
     root_logger.addHandler(stream_handler)
 
     # Make sure the logs directory exists
-    os.makedirs(app_dirs.user_log_dir, exist_ok=True)
+    os.makedirs(USER_LOG_DIR, exist_ok=True)
     # Create the file handler
     file_handler = RotatingFileHandler(
-        os.path.join(app_dirs.user_log_dir, "lisp.log"),
+        os.path.join(USER_LOG_DIR, "lisp.log"),
         maxBytes=10 * (2**20),
         backupCount=5,
     )
