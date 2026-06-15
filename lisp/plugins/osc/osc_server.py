@@ -19,7 +19,17 @@
 import logging
 from threading import Lock
 
-from liblo import ServerThread, ServerError
+try:
+    from liblo import ServerThread, ServerError
+except ImportError:
+    # pyliblo3 / liblo is an optional native dependency. When it is missing the
+    # OSC plugin still loads (cue and settings register), but the server is a
+    # no-op; see OscServer.start().
+    ServerThread = None
+
+    class ServerError(Exception):
+        pass
+
 
 from lisp.core.signal import Signal
 from lisp.core.util import EqEnum
@@ -81,6 +91,16 @@ class OscServer:
 
     def start(self):
         if self.__running:
+            return
+
+        if ServerThread is None:
+            logger.warning(
+                translate(
+                    "OscServerError",
+                    "OSC server unavailable: the 'liblo' library "
+                    "(pyliblo3) is not installed.",
+                )
+            )
             return
 
         try:
