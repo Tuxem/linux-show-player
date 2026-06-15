@@ -55,9 +55,13 @@ toml = "*"
 packaging = "*"
 pygobject-stubs = "^2.11.0"
 ruff = "^0.6.9"
+pytest = "^8.0"
 
 [tool.poetry.scripts]
 linux-show-player = "lisp.main:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 80

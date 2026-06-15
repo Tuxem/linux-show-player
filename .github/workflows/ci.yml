@@ -1,0 +1,89 @@
+# Cross-platform CI for Linux Show Player.
+#
+# Strategy (see docs/cross-platform/05_test_strategy.md):
+#  - `lint` and `unit-linux` are the anti-regression guards: they MUST stay
+#    green on every PR. `unit-linux` runs the full headless suite with real
+#    GStreamer/Qt under xvfb, with ALSA/Pulse available.
+#  - `unit-windows` / `unit-macos` start as a *smoke* level: they import the
+#    package and run the portable, hardware-free subset (Level 1). They grow in
+#    coverage phase by phase as cross-platform support lands.
+
+name: CI
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check .
+
+  # Anti-regression guard for Linux: full suite, real GStreamer + Qt, xvfb.
+  unit-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb \
+            libgirepository1.0-dev gir1.2-gstreamer-1.0 \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            gstreamer1.0-alsa gstreamer1.0-pulseaudio \
+            libasound2-dev libpulse-dev \
+            qtbase5-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install the runtime deps needed by the headless tests. The full
+          # poetry environment (pyalsa/pyliblo3 from git) is not required for
+          # the Level 1/2 suite.
+          pip install pytest platformdirs appdirs PyGObject PyQt5
+
+      - name: Run tests (headless, under xvfb)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: xvfb-run -a python -m pytest -v
+
+  # Smoke level: package import + portable, hardware-free tests.
+  unit-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal dependencies
+        run: pip install pytest platformdirs appdirs
+      - name: Run portable tests (Level 1)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -v tests/test_paths.py
+
+  unit-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal dependencies
+        run: pip install pytest platformdirs appdirs
+      - name: Run portable tests (Level 1)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -v tests/test_paths.py
