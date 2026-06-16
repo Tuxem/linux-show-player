@@ -76,11 +76,33 @@ function Test-Admin {
         [Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Test-ValidMsi($path) {
+    # An MSI is an OLE2 compound document: first 8 bytes are D0 CF 11 E0 A1 B1
+    # 1A E1. A truncated download or an HTML error page won't match (exit 1620).
+    if (-not (Test-Path $path)) { return $false }
+    if ((Get-Item $path).Length -lt 1MB) { return $false }
+    $magic = [byte[]](0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)
+    $buf = New-Object byte[] 8
+    $fs = [System.IO.File]::OpenRead($path)
+    try { $null = $fs.Read($buf, 0, 8) } finally { $fs.Close() }
+    for ($i = 0; $i -lt 8; $i++) {
+        if ($buf[$i] -ne $magic[$i]) { return $false }
+    }
+    return $true
+}
+
 function Install-Msi($url, $name) {
     $dst = Join-Path $BuildDir $name
-    if (-not (Test-Path $dst)) {
+    if (-not (Test-ValidMsi $dst)) {
+        if (Test-Path $dst) {
+            Write-Host "==> Cached $name is invalid/incomplete; re-downloading"
+            Remove-Item $dst -Force
+        }
         Write-Host "==> Downloading $name"
         Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
+        if (-not (Test-ValidMsi $dst)) {
+            throw "Downloaded $name is not a valid MSI (corrupt/incomplete)."
+        }
     }
     $log = Join-Path $BuildDir "$name.install.log"
     Write-Host "==> Installing $name (silent, full feature set)"
