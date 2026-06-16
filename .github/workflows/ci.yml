@@ -87,3 +87,48 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -v tests/test_paths.py
+
+  # Frozen .exe + installer. This is our "container, not the dev's machine"
+  # build: PyInstaller cannot cross-compile from Linux, so the reproducible
+  # build environment is the ephemeral windows runner itself. The matrix builds
+  # the architectures in parallel (one runner each) -- extend `include` with
+  # arm64 once a GStreamer arm64 Windows runtime is published.
+  build-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: windows-latest
+          # - arch: arm64
+          #   runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build bundle + installer
+        shell: pwsh
+        run: ./scripts/windows/build.ps1 -Arch ${{ matrix.arch }}
+
+      - name: Smoke-test the frozen executable
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $exe = "build/windows/dist/LinuxShowPlayer/LinuxShowPlayer.exe"
+          if (-not (Test-Path $exe)) { throw "exe not produced" }
+          # --help exits 0 without opening the UI: proves imports + GStreamer load.
+          & $exe --help
+          if ($LASTEXITCODE -ne 0) { throw "smoke run failed ($LASTEXITCODE)" }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LinuxShowPlayer-windows-${{ matrix.arch }}
+          path: |
+            build/windows/installer/*.exe
+            build/windows/dist/LinuxShowPlayer/**
+          if-no-files-found: warn

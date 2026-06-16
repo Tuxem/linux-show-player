@@ -1,0 +1,24 @@
+# Cross-platform runtime dependencies for the Windows build.
+#
+# Mirrors pyproject.toml MINUS the Linux-only native bindings
+# (jack-client, pyalsa, pyliblo3), which are gated by `sys_platform == 'linux'`
+# markers and must never be installed on Windows.
+#
+# PyGObject is intentionally NOT listed here: on Windows it must be built
+# against the GStreamer *devel* package's pkg-config, so build.ps1 installs it
+# in a dedicated step after GStreamer is in place.
+
+platformdirs>=4.2
+falcon>=4.0.1
+mido>=1.3.3
+PyQt5>=5.15.2
+PyQt5-Qt5>=5.15.2
+python-rtmidi>=1.1
+requests>=2.20
+sortedcontainers>=2.0
+humanize>=4.8.0
+numpy>=1.26.4,<3.0.0
+qdigitalmeter>=0.1.0
+
+# Build tooling
+pyinstaller>=6.6
