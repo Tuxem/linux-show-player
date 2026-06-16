@@ -15,10 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
-import fcntl
 import logging
 import os
 import signal
+
+try:
+    # POSIX-only: used by PyQtUnixSignalHandler for a non-blocking signal pipe.
+    # Absent on Windows, where the handler degrades to a no-op (see below).
+    import fcntl
+except ImportError:
+    fcntl = None
 from itertools import chain
 
 from PyQt5.QtCore import QTranslator, QLocale, QSocketNotifier
@@ -173,6 +179,13 @@ class PyQtUnixSignalHandler:
     """
 
     def __init__(self):
+        # Without fcntl (e.g. Windows) the non-blocking pipe trick is
+        # unavailable, so this becomes a no-op context manager. Termination
+        # signals are still handled cross-platform via install_quit_handler().
+        self._enabled = fcntl is not None
+        if not self._enabled:
+            return
+
         # Create a non-blocking pipe
         self._rfd, self._wfd = os.pipe()
         for fd in (self._rfd, self._wfd):
@@ -187,6 +200,9 @@ class PyQtUnixSignalHandler:
         self._orig_wfd = signal.set_wakeup_fd(self._wfd)
 
     def release(self):
+        if not self._enabled:
+            return
+
         # Stop the notifier
         self._notifier.setEnabled(False)
         # Restore the original descriptor
