@@ -76,41 +76,42 @@ function Test-Admin {
         [Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-function Test-ValidMsi($path) {
-    # Authoritative check: open the package with the Windows Installer engine,
-    # exactly as msiexec does. A truncated download (e.g. Ctrl-C) has a valid
-    # OLE header but fails to open here -- the only reliable way to catch the
-    # exit-1620 "package invalid" case without trusting Content-Length.
+function Test-MsiHeader($path) {
+    # Cheap sanity only: a real MSI is an OLE2 compound file (magic
+    # D0 CF 11 E0 A1 B1 1A E1). This catches HTML error pages / truncated-to-
+    # nothing files, NOT mid-stream truncation -- completeness is guaranteed by
+    # the atomic .partial download below, so we don't need to parse the package.
     if (-not (Test-Path $path)) { return $false }
     if ((Get-Item $path).Length -lt 1MB) { return $false }
-    try {
-        $installer = New-Object -ComObject WindowsInstaller.Installer
-        # OpenDatabase mode 0 = read-only; throws if the package is invalid.
-        $db = $installer.GetType().InvokeMember(
-            'OpenDatabase', 'InvokeMethod', $null, $installer, @($path, 0))
-        [void]$db
-        return $true
-    } catch {
-        return $false
-    } finally {
-        if ($installer) {
-            [void][Runtime.InteropServices.Marshal]::ReleaseComObject($installer)
-        }
+    $magic = [byte[]](0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)
+    $buf = New-Object byte[] 8
+    $fs = [System.IO.File]::OpenRead($path)
+    try { $null = $fs.Read($buf, 0, 8) } finally { $fs.Close() }
+    for ($i = 0; $i -lt 8; $i++) {
+        if ($buf[$i] -ne $magic[$i]) { return $false }
     }
+    return $true
 }
 
 function Install-Msi($url, $name) {
     $dst = Join-Path $BuildDir $name
-    if (-not (Test-ValidMsi $dst)) {
+    if (-not (Test-MsiHeader $dst)) {
         if (Test-Path $dst) {
-            Write-Host "==> Cached $name is invalid/incomplete; re-downloading"
+            Write-Host "==> Cached $name looks invalid; re-downloading"
             Remove-Item $dst -Force
         }
+        # Download to a .partial and only promote it on success. An interrupted
+        # (Ctrl-C) run thus leaves a *.partial, never a final file that looks
+        # usable but is truncated (which msiexec rejects with exit 1620).
+        $tmp = "$dst.partial"
+        if (Test-Path $tmp) { Remove-Item $tmp -Force }
         Write-Host "==> Downloading $name"
-        Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
-        if (-not (Test-ValidMsi $dst)) {
+        Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
+        if (-not (Test-MsiHeader $tmp)) {
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
             throw "Downloaded $name is not a valid MSI (corrupt/incomplete)."
         }
+        Move-Item -Force $tmp $dst
     }
     $log = Join-Path $BuildDir "$name.install.log"
     Write-Host "==> Installing $name (silent, full feature set)"
