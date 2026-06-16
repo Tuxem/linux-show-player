@@ -69,17 +69,42 @@ $GstBase = "https://gstreamer.freedesktop.org/data/pkg/windows/$GstVersion/msvc"
 $Runtime = "gstreamer-1.0-msvc-$GstArch-$GstVersion.msi"
 $Devel   = "gstreamer-1.0-devel-msvc-$GstArch-$GstVersion.msi"
 
+function Test-Admin {
+    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($id)
+    return $principal.IsInRole(
+        [Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
 function Install-Msi($url, $name) {
     $dst = Join-Path $BuildDir $name
     if (-not (Test-Path $dst)) {
         Write-Host "==> Downloading $name"
         Invoke-WebRequest -Uri $url -OutFile $dst -UseBasicParsing
     }
+    $log = Join-Path $BuildDir "$name.install.log"
     Write-Host "==> Installing $name (silent, full feature set)"
-    # ADDLOCAL=ALL installs every plugin set (base/good/bad/libav).
-    $p = Start-Process msiexec.exe -Wait -PassThru -ArgumentList `
-        "/i", "`"$dst`"", "/qn", "/norestart", "ADDLOCAL=ALL"
-    if ($p.ExitCode -ne 0) { throw "msiexec failed for $name ($($p.ExitCode))" }
+    # ADDLOCAL=ALL installs every plugin set (base/good/bad/libav). The MSI is a
+    # per-machine install to C:\gstreamer and needs elevation; -Verb RunAs
+    # prompts UAC on an interactive machine and is unnecessary on an already
+    # elevated CI runner (so we only add it when not already admin). /l*v writes
+    # a verbose log to diagnose any failure (exit 1603 = generic fatal error).
+    $spArgs = @(
+        "/i", "`"$dst`"", "/qn", "/norestart", "ADDLOCAL=ALL",
+        "/l*v", "`"$log`""
+    )
+    $sp = @{
+        FilePath     = "msiexec.exe"
+        ArgumentList = $spArgs
+        Wait         = $true
+        PassThru     = $true
+    }
+    if (-not (Test-Admin)) { $sp.Verb = "RunAs" }
+    $p = Start-Process @sp
+    if ($p.ExitCode -ne 0) {
+        Write-Warning "msiexec verbose log: $log"
+        throw "msiexec failed for $name (exit $($p.ExitCode)); see log above."
+    }
 }
 
 Install-Msi "$GstBase/$Runtime" $Runtime

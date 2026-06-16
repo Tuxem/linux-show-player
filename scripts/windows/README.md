@@ -42,6 +42,10 @@ Use this for the **real audio/MIDI test** (manual checklist, level 4 of
 Prerequisites: Python 3.11 (x64), and optionally
 [Inno Setup 6](https://jrsoftware.org/isdl.php) on `PATH` (for the installer).
 
+> The GStreamer MSIs are per-machine installs and need elevation. The script
+> auto-elevates the `msiexec` step via UAC, but running the **whole** PowerShell
+> session "as Administrator" avoids two consecutive UAC prompts.
+
 ```powershell
 # From the repo root, in PowerShell:
 pwsh scripts/windows/build.ps1                       # x86_64, default GStreamer
