@@ -45,7 +45,7 @@ Prerequisites: Python 3.11 (x64), and optionally
 ```powershell
 # From the repo root, in PowerShell:
 pwsh scripts/windows/build.ps1                       # x86_64, default GStreamer
-pwsh scripts/windows/build.ps1 -GstVersion 1.24.12   # pin GStreamer
+pwsh scripts/windows/build.ps1 -GstVersion 1.24.13   # pin GStreamer
 pwsh scripts/windows/build.ps1 -SkipInstaller        # bundle only
 ```
 

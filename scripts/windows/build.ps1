@@ -34,7 +34,7 @@
 param(
     [ValidateSet("x86_64", "arm64")]
     [string]$Arch = "x86_64",
-    [string]$GstVersion = "1.24.12",
+    [string]$GstVersion = "1.24.13",
     [switch]$SkipInstaller
 )
 
@@ -64,7 +64,8 @@ $Py = Join-Path $VenvDir "Scripts\python.exe"
 
 # --- 2. GStreamer runtime + devel ----------------------------------------
 $GstArch = if ($Arch -eq "arm64") { "arm64" } else { "x86_64" }
-$GstBase = "https://gstreamer.freedesktop.org/data/pkg/windows/$GstVersion"
+# Note the /msvc subdir: the official tree is .../windows/<ver>/msvc/<file>.msi
+$GstBase = "https://gstreamer.freedesktop.org/data/pkg/windows/$GstVersion/msvc"
 $Runtime = "gstreamer-1.0-msvc-$GstArch-$GstVersion.msi"
 $Devel   = "gstreamer-1.0-devel-msvc-$GstArch-$GstVersion.msi"
 
